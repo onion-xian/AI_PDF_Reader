@@ -8,6 +8,7 @@ import { PdfViewer } from './viewer.js';
 import { SelectionManager } from './selection.js';
 import { ChatPanel } from './chat.js';
 import { SettingsPanel, ScopePopover } from './settings.js';
+import { ManualAnnotManager, ANNOT_TYPES, ANNOT_COLORS } from './manual-annot.js';
 
 const THUMB_W = 124;
 
@@ -67,6 +68,14 @@ class App {
       onDiscussWeb: (sel) => this.startDiscussion(sel, 'web')
     });
     this.selection.onCaptureReady((payload) => this.onCaptured(payload));
+
+    this.manualAnnot = new ManualAnnotManager({
+      viewer: this.viewer,
+      onChanged: () => this.updateStatus(),
+      onBusy: (t) => this.showBusy(t),
+      onBusyDone: () => this.hideBusy()
+    });
+    this.bindAnnotToolbar();
 
     this.bindTopbar();
     this.bindSidebar();
@@ -501,9 +510,13 @@ class App {
     });
     window.addEventListener('open-settings', () => this.settings.open());
     window.addEventListener('open-scope-popover', (e) => this.scopePop.toggle(e.detail.anchor));
-    window.addEventListener('pdf-dirty', () => {
-      if (this.doc) this.reloadPdf();
+    // 注记写入只改动注记层，PDF 的页面内容/文本层并未变化，
+    // 因此这里走增量刷新即可——完整重载（重解析 PDF + 重抽全文）会明显卡顿。
+    window.addEventListener('pdf-dirty', (e) => {
+      if (this.doc) this.refreshAnnotationsIncremental(e.detail?.pages);
     });
+    window.addEventListener('busy', (e) => this.showBusy(e.detail?.text));
+    window.addEventListener('busy-done', () => this.hideBusy());
   }
 
   bindIpc() {
@@ -544,6 +557,7 @@ class App {
 
       this.doc = opened.meta;
       this.chat.setDocument(this.doc, opened.conversations);
+      await this.manualAnnot.setDocument(this.doc.hash, this.doc.filePath);
 
       const info = await this.viewer.load(res.data);
       if (info.title && info.title !== this.doc.title) {
@@ -603,8 +617,105 @@ class App {
     }
   }
 
-  refreshAnnotations() {
-    this.viewer.setAnnotations(this.chat.conversations, this.chat.activeId);
+  refreshAnnotations(pages = null) {
+    this.viewer.setAnnotations(this.chat.conversations, this.chat.activeId, pages);
+  }
+
+  /**
+   * 注记变更后的增量刷新：只重绘受影响的注记层，保留页码 / 缩放 / 滚动位置。
+   * 不重新读取文件、不重新解析 PDF、不重抽全文、不重建缩略图。
+   * @param {number[]|null} pages 受影响的页码；null 表示全量重绘
+   */
+  refreshAnnotationsIncremental(pages = null) {
+    const st = this.viewer.captureViewState();
+    this.refreshAnnotations(pages);
+    this.viewer.restoreViewState(st);
+    this.updateStatus();
+    if (this.sidebarView === 'discussions') this.renderSidebar();
+  }
+
+  // ------------------------------------------------------------ 忙碌遮罩
+  showBusy(text = '处理中…') {
+    const el = $('#busyOverlay');
+    if (!el) return;
+    const t = $('#busyText');
+    if (t) t.textContent = text;
+    el.hidden = false;
+  }
+
+  hideBusy() {
+    const el = $('#busyOverlay');
+    if (el) el.hidden = true;
+  }
+
+  // ------------------------------------------------------------ 手动注记
+  bindAnnotToolbar() {
+    // 类型工具：选中文本后点击即应用
+    for (const t of ANNOT_TYPES) {
+      const btn = $(`#maTool-${t.id}`);
+      if (!btn) continue;
+      btn.title = `${t.name}：先在 PDF 中选中文字，再点此应用`;
+      btn.addEventListener('click', () => {
+        this.manualAnnot.setTool(t.id);
+        this.applyAnnotToSelection();
+      });
+    }
+
+    // 颜色圆点动态生成，省得在 HTML 里重复六遍
+    const cbox = $('#maColors');
+    if (cbox) {
+      cbox.innerHTML = '';
+      for (const c of ANNOT_COLORS) {
+        const b = document.createElement('button');
+        b.className = `ma-swatch ma-swatch-${c.id}`;
+        b.id = `maColor-${c.id}`;
+        b.title = `颜色：${c.name}`;
+        b.addEventListener('click', () => this.manualAnnot.setColor(c.id));
+        cbox.appendChild(b);
+      }
+    }
+
+    $('#maToolEraser')?.addEventListener('click', () => this.manualAnnot.toggleEraser());
+    $('#maWritePdf')?.addEventListener('click', () => this.writeManualAnnotsToPdf());
+
+    // Delete / Backspace 删除选中的注记（输入框内不拦截）
+    window.addEventListener('keydown', (e) => {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+      const ae = document.activeElement;
+      const tag = (ae && ae.tagName ? ae.tagName : '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || (ae && ae.isContentEditable)) return;
+      const sel = this.manualAnnot.getSelected();
+      if (!sel) return;
+      e.preventDefault();
+      this.manualAnnot.remove(sel.id);
+    });
+
+    this.manualAnnot.syncToolbar();
+  }
+
+  /** 把当前工具应用到现有文本选区 */
+  async applyAnnotToSelection() {
+    const sel = this.selection && this.selection.current;
+    if (!sel || !sel.rects || !sel.rects.length) {
+      return toast('先在 PDF 中选中一段文字，再点击注记工具', 'warn', 2600);
+    }
+    const item = await this.manualAnnot.createFromSelection(sel);
+    if (!item) return undefined;
+    const t = ANNOT_TYPES.find((x) => x.id === item.type);
+    toast(item.type === 'note' ? '已添加批注，可直接输入文字' : `已添加${t ? t.name : '注记'}`, 'ok', 2000);
+    this.selection.hidePopup();
+    return undefined;
+  }
+
+  async writeManualAnnotsToPdf() {
+    if (!this.doc) return toast('请先打开 PDF', 'warn');
+    const res = await this.manualAnnot.writeToPdf();
+    if (!res || !res.ok) return toast((res && res.error) || '写回失败', 'err', 4000);
+    return toast(
+      res.backupPath ? `已写回 ${res.count} 条注记（原文件已自动备份）` : `已写回 ${res.count} 条注记`,
+      'ok',
+      3600
+    );
   }
 
   refreshAfterConversationChange() {

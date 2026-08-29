@@ -809,17 +809,24 @@ export class ChatPanel {
     const geom = await this.viewer.cssRectsToAnnotGeom(conv.anchor.page, conv.anchor.rects);
     if (!geom) return toast('无法确定注记位置', 'err');
 
+    // 大文件写盘较慢，给出可见的忙碌提示
     this._setStatus('正在写回 PDF 注记…');
-    const res = await window.api.writeAnnotation({
-      filePath: this.doc.filePath,
-      convId: conv.id,
-      hash: this.doc.hash,
-      contents,
-      items: [{ page: conv.anchor.page, rect: geom.rect, quadPoints: geom.quadPoints }]
-    });
+    window.dispatchEvent(new CustomEvent('busy', { detail: { text: '正在写回 PDF 注记…' } }));
+    let res;
+    try {
+      res = await window.api.writeAnnotation({
+        filePath: this.doc.filePath,
+        convId: conv.id,
+        hash: this.doc.hash,
+        contents,
+        items: [{ page: conv.anchor.page, rect: geom.rect, quadPoints: geom.quadPoints }]
+      });
+    } finally {
+      window.dispatchEvent(new CustomEvent('busy-done'));
+      this._setStatus('');
+    }
 
     if (!res.ok) {
-      this._setStatus('');
       return toast(res.error || '写入注记失败', 'err', 5000);
     }
 
@@ -834,8 +841,10 @@ export class ChatPanel {
       'ok',
       3600
     );
-    // 让外部知道文档已变更，需要重新加载显示注记
-    window.dispatchEvent(new CustomEvent('pdf-dirty', { detail: { hash: this.doc.hash } }));
+    // 仅通知受影响的页码，上层据此做局部增量重绘（不再整体重载 PDF）
+    window.dispatchEvent(
+      new CustomEvent('pdf-dirty', { detail: { hash: this.doc.hash, pages: [conv.anchor.page] } })
+    );
   }
 
   // ================================================================ 状态显示

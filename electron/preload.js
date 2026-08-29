@@ -44,6 +44,12 @@ contextBridge.exposeInMainWorld('api', {
   writeAnnotation: (opts) => ipcRenderer.invoke('annot:write', opts),
   removeAnnotation: (opts) => ipcRenderer.invoke('annot:remove', opts),
 
+  // ---------- 手动注记（本地存储 + 按需写回 PDF）
+  listManualAnnots: (hash) => ipcRenderer.invoke('manualAnnot:list', hash),
+  saveManualAnnots: (hash, items) => ipcRenderer.invoke('manualAnnot:save', hash, items),
+  writeManualAnnotsToPdf: (opts) => ipcRenderer.invoke('manualAnnot:writeToPdf', opts),
+  removeManualAnnotsFromPdf: (opts) => ipcRenderer.invoke('manualAnnot:removeFromPdf', opts),
+
   // ---------- 联网检索
   webSearch: (query) => ipcRenderer.invoke('search:web', query),
 

@@ -664,3 +664,125 @@ input, textarea { font-family: inherit; font-size: inherit; color: inherit; }
 }
 .md .page-ref { color: var(--purple); font-weight: 600; }
 .md strong { font-weight: 700; color: var(--text-0); }
+
+/* =========================================================================
+   忙碌遮罩（写回 PDF 注记等耗时操作）
+   ========================================================================= */
+.busy-overlay {
+  position: fixed; inset: 0; z-index: 9000;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(1.5px);
+}
+.busy-overlay[hidden] { display: none; }
+.busy-card {
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-2);
+  padding: 26px 38px; min-width: 200px;
+}
+.busy-spinner {
+  width: 26px; height: 26px; border-radius: 50%;
+  border: 2.5px solid var(--border); border-top-color: var(--accent);
+  animation: busy-spin 0.75s linear infinite;
+}
+.busy-text { font-size: 13px; color: var(--text-0); }
+@keyframes busy-spin { to { transform: rotate(360deg); } }
+
+/* =========================================================================
+   手动注记：工具条 / 画布上的标记 / 编辑气泡
+   ========================================================================= */
+
+/* ---------------- 画布上的注记标记 ---------------- */
+.ma-mark {
+  position: absolute; pointer-events: auto; cursor: pointer;
+  border-radius: 2px;
+  --ma-c: rgba(255, 214, 61, 0.40);
+  --ma-solid: #e8c33a;
+  transition: box-shadow 0.15s, background 0.15s;
+}
+.ma-c-yellow { --ma-c: rgba(255, 214, 61, 0.40); --ma-solid: #e8c33a; }
+.ma-c-green  { --ma-c: rgba(70, 185, 91, 0.38);  --ma-solid: #3f9e52; }
+.ma-c-blue   { --ma-c: rgba(77, 157, 255, 0.38); --ma-solid: #4d9dff; }
+.ma-c-pink   { --ma-c: rgba(255, 122, 168, 0.38); --ma-solid: #f06292; }
+.ma-c-purple { --ma-c: rgba(168, 120, 245, 0.38); --ma-solid: #a878f5; }
+.ma-c-orange { --ma-c: rgba(255, 150, 60, 0.38);  --ma-solid: #f5902a; }
+
+.ma-highlight { background: var(--ma-c); }
+.ma-underline { border-bottom: 2px solid var(--ma-solid); }
+.ma-strikeout {
+  background: linear-gradient(
+    transparent calc(50% - 1px), var(--ma-solid) calc(50% - 1px),
+    var(--ma-solid) calc(50% + 1px), transparent calc(50% + 1px)
+  );
+}
+/* 批注：高亮打底 + 虚线下划线，与纯高亮区分开 */
+.ma-note {
+  background: var(--ma-c);
+  border-bottom: 2px dashed var(--ma-solid);
+}
+.ma-mark:hover { box-shadow: 0 0 0 1px var(--ma-solid), 0 2px 10px rgba(0, 0, 0, 0.25); }
+.ma-mark.ma-selected { outline: 1.5px solid var(--accent); outline-offset: 1px; }
+
+/* ---------------- 标题栏工具组 ---------------- */
+.ma-bar { display: flex; align-items: center; gap: 2px; }
+.ma-btn-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: var(--radius-sm);
+  background: transparent; border: 1px solid transparent;
+  color: var(--text-1); cursor: pointer; padding: 0;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.ma-btn-icon:hover { background: var(--bg-hover); color: var(--text-0); }
+.ma-btn-icon.on {
+  background: var(--accent-dim); color: var(--accent);
+  border-color: rgba(77, 157, 255, 0.35);
+}
+.ma-sep { display: inline-block; width: 1px; height: 18px; background: var(--border); margin: 0 5px; }
+.ma-colors { display: inline-flex; align-items: center; gap: 3px; }
+
+.ma-swatch {
+  width: 13px; height: 13px; border-radius: 50%; padding: 0; cursor: pointer;
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
+  transition: transform 0.12s, border-color 0.12s;
+}
+.ma-swatch:hover { transform: scale(1.18); }
+.ma-swatch.on { border-color: var(--text-0); box-shadow: 0 0 0 1px var(--bg-2); }
+.ma-swatch-yellow { background: #e8c33a; }
+.ma-swatch-green  { background: #3f9e52; }
+.ma-swatch-blue   { background: #4d9dff; }
+.ma-swatch-pink   { background: #f06292; }
+.ma-swatch-purple { background: #a878f5; }
+.ma-swatch-orange { background: #f5902a; }
+
+/* ---------------- 编辑气泡 ---------------- */
+.ma-editor {
+  position: fixed; z-index: 800; width: 262px;
+  background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow-2);
+  padding: 11px; display: flex; flex-direction: column; gap: 9px;
+}
+.ma-editor.hidden { display: none; }
+.ma-editor-head { font-size: 12px; font-weight: 600; color: var(--text-1); }
+.ma-editor-colors { display: flex; gap: 7px; }
+.ma-editor-note {
+  width: 100%; min-height: 64px; resize: vertical; box-sizing: border-box;
+  background: var(--bg-3); color: var(--text-0);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 6px 8px; font-size: 12px; line-height: 1.55; font-family: var(--font-ui);
+}
+.ma-editor-note:focus { outline: none; border-color: var(--accent); }
+.ma-editor-quote {
+  font-size: 11px; color: var(--text-2); line-height: 1.55;
+  max-height: 58px; overflow: hidden;
+  border-left: 2px solid var(--border); padding-left: 7px;
+}
+.ma-editor-actions { display: flex; justify-content: flex-end; gap: 6px; }
+.ma-btn {
+  padding: 4px 12px; font-size: 12px; border-radius: var(--radius-sm);
+  background: var(--bg-3); color: var(--text-0);
+  border: 1px solid var(--border); cursor: pointer;
+}
+.ma-btn:hover { background: var(--bg-hover); }
+.ma-btn.danger { color: var(--red); border-color: rgba(240, 84, 106, 0.35); }
+.ma-btn.danger:hover { background: rgba(240, 84, 106, 0.12); }

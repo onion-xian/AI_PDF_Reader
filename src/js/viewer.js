@@ -31,7 +31,10 @@ export class PdfViewer {
     this.pageLines = new Map(); // page -> { lines: [{no,text,rect}], text }
     this.renderTasks = new Map(); // page -> RenderTask
     this.rendered = new Set();
-    this.annotations = [];
+    this.annotations = [];      // AI 会话注记
+    this.manualAnnots = [];      // 用户手动注记
+    this.selectedManualId = null;
+    this.onManualAnnotClick = null;
     this.outline = [];
     this.extracting = false;
     // 每次换文档递增，用于在 await 之后判断「这份文档还是不是当前那份」
@@ -217,7 +220,8 @@ export class PdfViewer {
       console.warn('[viewer] text layer failed on page', n, e);
     }
 
-    this._paintAnnotationsForPage(n);
+    // 该页渲染完成后补画注记（AI 注记与手动注记一起）
+    this._paintAllAnnotations([n]);
   }
 
   async _renderTextLayer(wrap, page, viewport, n) {
@@ -439,8 +443,35 @@ export class PdfViewer {
         this.renderPage(Number(wrap.dataset.page));
       }
     }
-    this._paintAnnotations();
+    this._paintAllAnnotations();
     this._updateCurrentPage();
+  }
+
+  /**
+   * 抓取当前视图状态（页码 / 缩放 / 滚动位置）。
+   * 用于注记写入等场景：刷新注记层前后各调一次，避免视图跳动。
+   */
+  captureViewState() {
+    return {
+      page: this.currentPage,
+      scale: this.scale,
+      scrollTop: this.scrollEl ? this.scrollEl.scrollTop : 0
+    };
+  }
+
+  /**
+   * 恢复视图状态。仅在确有偏差时才动，避免无谓的重渲染。
+   */
+  restoreViewState(st) {
+    if (!st) return;
+    if (this.scrollEl && Math.abs(this.scrollEl.scrollTop - st.scrollTop) > 0.5) {
+      this.scrollEl.scrollTop = st.scrollTop;
+    }
+    if (st.scale && Math.abs(st.scale - this.scale) >= 0.001) {
+      // 缩放确实变了才走 setScale（它会重建 canvas，代价高）
+      return this.setScale(st.scale);
+    }
+    return undefined;
   }
 
   fitWidth() {
@@ -498,25 +529,98 @@ export class PdfViewer {
   /**
    * @param {Array} conversations 含 anchor.rects（CSS scale=1）与 anchor.page
    */
-  setAnnotations(conversations, activeId = null) {
+  setAnnotations(conversations, activeId = null, pages = null) {
     this.annotations = conversations || [];
     this.activeConvId = activeId;
-    this._paintAnnotations();
+    this._paintAllAnnotations(pages);
   }
 
-  _paintAnnotations() {
+  /** 手动注记；与 AI 注记共用同一个 .annot-layer，因此走统一重绘入口 */
+  setManualAnnotations(items, selectedId = null, pages = null) {
+    this.manualAnnots = items || [];
+    this.selectedManualId = selectedId;
+    this._paintAllAnnotations(pages);
+  }
+
+  /**
+   * 统一重绘入口：AI 会话注记 + 手动注记一起画。
+   * 两者共用 DOM 图层，分开画会互相清空，所以必须在同一次清空之后绘制。
+   *
+   * @param {number[]|null} pages 只重绘这些页；为 null 时全量重绘。
+   *   增量场景下只传受影响的页码，避免大文档逐页清空 DOM。
+   */
+  _paintAllAnnotations(pages = null) {
+    const only = pages && pages.length ? new Set(pages.map(Number)) : null;
+
+    // 先清空目标页（即便该页已无注记，也要清掉残留）
     for (const wrap of this.pageWraps) {
+      const n = Number(wrap.dataset.page);
+      if (only && !only.has(n)) continue;
       const layer = wrap.querySelector('.annot-layer');
       if (layer) layer.innerHTML = '';
     }
+
+    this._paintConversationAnnotations(only);
+    this._paintManualAnnotations(only);
+  }
+
+  _paintConversationAnnotations(only) {
     const byPage = new Map();
-    for (const c of this.annotations) {
+    for (const c of this.annotations || []) {
       const a = c.anchor;
       if (!a || a.page == null || !Array.isArray(a.rects) || !a.rects.length) continue;
+      if (only && !only.has(Number(a.page))) continue;
       if (!byPage.has(a.page)) byPage.set(a.page, []);
       byPage.get(a.page).push(c);
     }
     for (const [page, list] of byPage) this._paintAnnotationsForPage(page, list);
+  }
+
+  _paintManualAnnotations(only) {
+    const byPage = new Map();
+    for (const it of this.manualAnnots || []) {
+      if (!it || it.page == null || !Array.isArray(it.rects) || !it.rects.length) continue;
+      if (only && !only.has(Number(it.page))) continue;
+      if (!byPage.has(it.page)) byPage.set(it.page, []);
+      byPage.get(it.page).push(it);
+    }
+    for (const [page, list] of byPage) this._paintManualForPage(page, list);
+  }
+
+  /** 绘制单条手动注记的所有矩形 */
+  _paintManualForPage(page, list) {
+    const wrap = this.pageWraps[page - 1];
+    if (!wrap) return;
+    const layer = wrap.querySelector('.annot-layer');
+    if (!layer) return;
+
+    for (const it of list) {
+      for (const r of it.rects) {
+        const el = document.createElement('div');
+        el.className =
+          'ma-mark' +
+          ` ma-${it.type}` +
+          ` ma-c-${it.color}` +
+          (it.id === this.selectedManualId ? ' ma-selected' : '');
+        el.style.left = `${r.x * this.scale}px`;
+        el.style.top = `${r.y * this.scale}px`;
+        el.style.width = `${Math.max(r.w * this.scale, 3)}px`;
+        el.style.height = `${Math.max(r.h * this.scale, 3)}px`;
+        el.dataset.maId = it.id;
+
+        const tip = [it.type === 'note' ? '批注' : '', it.note, it.quote]
+          .filter(Boolean)
+          .join(' · ');
+        if (tip) el.title = tip.slice(0, 200);
+
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          this.onManualAnnotClick?.(it.id, e);
+        });
+        layer.appendChild(el);
+      }
+    }
   }
 
   _paintAnnotationsForPage(page, list) {

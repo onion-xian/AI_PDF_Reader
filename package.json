@@ -1,14 +1,16 @@
 {
   "name": "pdf-ai-reader",
   "productName": "AI PDF Reader",
-  "version": "alpha20260829",
+  "version": "1.0.0-alpha.20260829",
   "description": "面向论文与专业书籍的 AI 辅助学习 PDF 阅读器",
   "main": "electron/main.js",
   "scripts": {
     "start": "node scripts/start.js",
     "smoke": "node scripts/smoke.js 13",
+    "test:manual": "node scripts/selftest-manual.js",
+    "make-icon": "node scripts/make-icon.js",
     "postinstall": "node scripts/copy-vendor.js",
-    "dist": "electron-builder --win"
+    "dist": "electron-builder --win --config.npmRebuild=false --config.win.signAndEditExecutable=false"
   },
   "author": "",
   "license": "MIT",
@@ -30,6 +32,7 @@
       "electron/**/*",
       "src/**/*",
       "vendor/**/*",
+      "build/**/*",
       "package.json"
     ],
     "extraMetadata": {
@@ -39,12 +42,19 @@
       "target": [
         { "target": "nsis", "arch": "x64" }
       ],
-      "icon": "build/icon.png"
+      "icon": "build/icon.ico"
     },
     "nsis": {
       "oneClick": false,
+      "perMachine": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "AI PDF Reader",
+      "uninstallDisplayName": "AI PDF Reader",
+      "artifactName": "AI-PDF-Reader-Setup-${version}.${ext}",
+      "displayLanguageSelector": false,
+      "deleteAppDataOnUninstall": false
     }
   }
 }

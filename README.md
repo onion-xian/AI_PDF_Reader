@@ -17,6 +17,10 @@
 - **上下文预算可控**：可设置 `maxTokens`、取文范围（around / selection / cursor / range / whole）、截断锚定策略，避免长文档烧钱。
 - **一轮讨论 = 一段会话**：每次完整讨论独立成一轮，新讨论生成新会话；会话是笔记的唯一数据源。
 - **注记写回 PDF**：用标准 PDF `Highlight` + 透明 `Link` 注记，点击可在 Adobe / Chrome 等阅读器里打开 `aidiscuss://` 深链回到本应用并恢复该段历史对话。
+- **手动标注（普通阅读器能力）**：工具栏提供 `高亮 / 下划线 / 删除线 / 批注` 四种类型 × `黄 / 绿 / 蓝 / 粉 / 紫 / 橙` 六种颜色；
+  拖选文字后点类型即可落标，批注可点开气泡编辑文本，支持选中、`Delete` 删除、橡皮擦定点擦除。
+  标注先存本地 JSON（即时生效、零等待），需要分享或归档时再点「写回 PDF」一次性烧进原文件（标准 `Highlight` / `Underline` / `StrikeOut` 注记，Adobe 可识别）。
+- **增量刷新**：AI 写回注记后只重绘受影响的页面注记层，不再重新解析 PDF、不重建缩略图，页码 / 缩放 / 滚动位置原样保留。
 - **专属 Markdown 笔记**：每个 PDF 一份 `<指纹>.md`，顶部是元信息表 + 讨论索引表，下方是逐轮详情（原文锚点、问答、检索来源、用量、结论、深链）。
 - **兼容多服务商**：内置 DeepSeek / OpenAI / Kimi / 通义 / 智谱 / 硅基流动 / OpenRouter / Ollama，以及自定义 OpenAI 兼容端点。视觉模型（截图讨论）自动识别。
 - **深色 / 浅色主题**、缩放、书库管理、拖拽打开、纯键盘操作。
@@ -58,7 +62,10 @@ npm start
 
 ```bash
 # Node 侧单测：注记读写 / 幂等 / 去重 / 指纹稳定 / 笔记 / token 截断 / 深链反查
-npm run smoke           # 42 项断言（selftest.js）
+npm run smoke           # 42 项断言（scripts/selftest.js）
+
+# Node 侧单测：手动标注——存储层 / 脏数据过滤 / 类型与色板常量 / 写回 PDF / 幂等 / 擦除
+npm run test:manual     # 28 项断言（scripts/selftest-manual.js）
 
 # 渲染侧端到端：生成 5 页样例 PDF → 启动 Mock 服务 → 启动 Electron → 跑 74 项断言
 # 见 scripts/uitest.js，需在本机有显示器 / 能跑 Electron 的环境执行
@@ -82,6 +89,7 @@ pdf-ai-reader/
 │       ├── search.js        # Tavily / 博查 适配层
 │       ├── tokens.js        # CJK 感知 token 估算 + 以锚点页为中心的上下文截断
 │       ├── annotations.js   # PDF 高亮 + 链接注记写入（pdf-lib，幂等 / 临时文件重命名）
+│       ├── manual-annot.js  # 手动标注本地存储层（<userData>/annotations/<指纹>.json）
 │       ├── notes.js         # 满量重建式 Markdown 笔记生成
 │       └── store.js         # 书库 + 会话存储（按路径优先匹配，保持指纹稳定）
 ├── src/
@@ -92,9 +100,12 @@ pdf-ai-reader/
 │       ├── selection.js     # 选区 / 区域截图管理（CSS 矩形 → 页码/行号/引用）
 │       ├── chat.js          # 对话面板（流式、历史、上下文装配、笔记同步、中止）
 │       ├── settings.js      # 设置面板（即时写入）+ 取文范围弹层
-│       └── app.js           # 入口装配、快捷键、拖拽、深链处理
+│       ├── manual-annot.js  # 标注工具栏状态机（类型 / 颜色 / 擦除 / 气泡编辑 / 写回）
+│       └── app.js           # 入口装配、快捷键、拖拽、深链处理、增量刷新
 ├── vendor/pdfjs/            # 内置的 pdf.js ESM + cmaps + standard_fonts（postinstall 复制）
-├── scripts/                 # 复制依赖、自测、Mock 模型、示例生成
+├── scripts/                 # 复制依赖、自测、Mock 模型、示例生成、图标制作
+│   ├── make-icon.js         # 由 build/icon.png 生成 16~256 六尺寸 ICO
+│   └── check-icon.js        # 解析 PE 资源段，验证 exe 内嵌图标尺寸
 └── examples/notes/          # 一份示例笔记（见 a1b2c3d4e5f60718.md）
 ```
 
@@ -110,8 +121,12 @@ pdf-ai-reader/
 | 全局设置 | `<userData>/settings.json` |
 | 书库索引 | `<userData>/library.json` |
 | 会话记录 | `<userData>/conversations/<指纹>.json` |
+| 手动标注 | `<userData>/annotations/<指纹>.json` |
 | Markdown 笔记 | `<userData>/notes/<指纹>.md` |
 | 原 PDF 备份 | 写注记前在 PDF 同目录生成 `<原名>.bak`（可在设置关闭） |
+
+> 手动标注**默认只存本地**，不会动原 PDF；点「写回 PDF」时才烧进文件，且烧写前会
+> 先清掉同名前缀的旧注记（幂等），因此重复写回不会产生叠加的高亮。
 
 > 注记是直接写回**原 PDF 文件**的（先写临时文件再重命名，异常可回退）。
 > 若 PDF 被其它程序占用会给出明确提示。
@@ -122,11 +137,23 @@ pdf-ai-reader/
 
 ```bash
 npm i -D electron-builder   # 若尚未安装
-npm run dist                 # 产出 dist/ 下的 NSIS 安装包（x64）
+npm run dist                 # 产出 dist/win-unpacked/ 下的免安装目录（x64）
 ```
 
 `package.json` 中的 `build` 段已配置好 `appId`、文件清单、NSIS 选项与图标位置
-（`build/icon.ico`，缺省不影响打包）。
+（`build/icon.ico`）。
+
+图标有三个坑，都已处理：
+
+1. **ICO 必须含 256×256**，否则 electron-builder 直接报错。
+   Pillow 的 `Image.save(format='ICO')` 在多数版本里只写最小的 16×16 帧，
+   所以改用 `npm run make-icon` 手工拼 ICO 二进制（ICONDIR + 6 个 ICONDIRENTRY + PNG 数据块）。
+2. **`files` 必须包含 `build/**/*`**，否则图标进不了 asar，
+   exe 图标对但窗口标题栏 / 任务栏仍是 Electron 默认图标。
+3. **`BrowserWindow` 要显式传 `icon`**，只改 exe 图标不会影响标题栏与任务栏。
+
+验证：`node scripts/check-icon.js "dist/win-unpacked/AI PDF Reader.exe"`
+会解析 PE 资源段并打印内嵌图标尺寸（应看到 16 / 32 / 48 / 256）。
 
 ---
 
@@ -139,6 +166,12 @@ npm run dist                 # 产出 dist/ 下的 NSIS 安装包（x64）
 - **截图讨论**走视觉模型，会剥离 base64 图片再持久化会话，避免单文件膨胀到数百 MB。
 - **深链恢复**：点击注记在外部阅读器里打开 `aidiscuss://conv/<id>?file=<指纹>`，
   本应用通过单实例锁接收并定位到对应会话。
+- **注记层不依赖文件内容**：AI 注记与手动标注的覆盖层都是纯 DOM，由会话对象 / 标注 JSON 驱动，
+  与 PDF 文件字节无关。因此写回注记后只需重绘注记层，无需重载 PDF。
+  两类注记共用同一个 `.annot-layer`，所以必须走 `_paintAllAnnotations()` 统一重绘——
+  分开绘制会互相清空。
+- **手动标注与 AI 注记互不干扰**：PDF 里用 `/NM` 前缀区分（`manual-` vs AI 的会话 id），
+  擦除时只删匹配前缀的注记。
 
 ---
 

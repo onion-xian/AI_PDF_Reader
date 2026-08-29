@@ -15,7 +15,13 @@ const { pathToFileURL } = require('url');
 const { Config } = require('./lib/config');
 const { Store } = require('./lib/store');
 const { Notes } = require('./lib/notes');
-const { writeAnnotation, removeAnnotation } = require('./lib/annotations');
+const {
+  writeAnnotation,
+  removeAnnotation,
+  writeManualAnnotations,
+  removeManualAnnotations
+} = require('./lib/annotations');
+const { ManualAnnotations } = require('./lib/manual-annot');
 const { chatStream, listModels, normalizeBaseURL } = require('./lib/ai-client');
 const { webSearch, formatSourcesForPrompt } = require('./lib/search');
 
@@ -28,6 +34,7 @@ let win = null;
 let config = null;
 let store = null;
 let notes = null;
+let manualAnnots = null;
 let pendingDeepLink = null;
 const abortControllers = new Map(); // requestId -> AbortController
 
@@ -107,6 +114,9 @@ function createWindow() {
     backgroundColor: '#0d1117',
     show: false,
     autoHideMenuBar: true,
+    // 显式指定图标，影响窗口标题栏与任务栏。
+    // 不设的话这两处会用 Electron 默认图标，即使 exe 本身的图标是对的。
+    icon: path.join(__dirname, '..', 'build', 'icon.ico'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -341,6 +351,34 @@ function setupIPC() {
     });
   });
 
+  // ---- 手动注记（本地 JSON 持久化 + 按需写回 PDF）
+  ipcMain.handle('manualAnnot:list', async (_e, hash) => {
+    return manualAnnots.list(hash);
+  });
+
+  ipcMain.handle('manualAnnot:save', async (_e, hash, items) => {
+    manualAnnots.save(hash, items);
+    return { ok: true, count: items ? items.length : 0 };
+  });
+
+  ipcMain.handle('manualAnnot:writeToPdf', async (_e, opts) => {
+    const cfg = config.get();
+    return writeManualAnnotations({
+      ...opts,
+      backup: cfg.backupBeforeAnnotate !== false,
+      backupDir: path.join(app.getPath('userData'), 'backups')
+    });
+  });
+
+  ipcMain.handle('manualAnnot:removeFromPdf', async (_e, opts) => {
+    const cfg = config.get();
+    return removeManualAnnotations({
+      ...opts,
+      backup: cfg.backupBeforeAnnotate !== false,
+      backupDir: path.join(app.getPath('userData'), 'backups')
+    });
+  });
+
   // ---- 联网检索
   ipcMain.handle('search:web', async (_e, query) => {
     return webSearch(config.get().search, query);
@@ -437,6 +475,7 @@ if (!singleLock) {
     config = new Config(app.getPath('userData'));
     store = new Store(app.getPath('userData'));
     notes = new Notes(app.getPath('userData'));
+    manualAnnots = new ManualAnnotations(app.getPath('userData'));
 
     if (process.platform !== 'darwin') {
       try {
