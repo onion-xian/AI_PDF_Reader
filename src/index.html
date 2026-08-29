@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' app: data: blob:; script-src 'self' app: 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' app: data: blob:; font-src 'self' app: data:; connect-src 'self' app: data: blob:; worker-src 'self' app: blob:;" />
+    <title>AI PDF Reader</title>
+    <link rel="stylesheet" href="app://local/src/css/main.css" />
+  </head>
+  <body>
+    <div class="app">
+      <!-- ============================ 顶栏 ============================ -->
+      <header class="titlebar">
+        <div class="tb-left">
+          <span class="tb-logo" title="AI PDF Reader">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+              <path fill="currentColor" d="M6 2h8l6 6v14H6z" opacity=".18"/>
+              <path fill="none" stroke="currentColor" stroke-width="1.6" d="M6 2h8l6 6v14H6zM14 2v6h6"/>
+              <path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" d="M9 13h6M9 17h4"/>
+            </svg>
+          </span>
+          <div class="tb-doc">
+            <span class="tb-title" id="docTitle">未打开文档</span>
+            <span class="tb-sub" id="docSub">Ctrl+O 打开 PDF</span>
+          </div>
+        </div>
+
+        <div class="tb-center">
+          <div class="pager">
+            <button class="icon-btn" id="btnPrevPage" title="上一页">
+              <svg viewBox="0 0 24 24" width="16" height="16"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M15 5l-7 7 7 7"/></svg>
+            </button>
+            <input class="page-input" id="pageInput" value="-" title="跳转到页码" />
+            <span class="page-total" id="pageTotal">/ -</span>
+            <button class="icon-btn" id="btnNextPage" title="下一页">
+              <svg viewBox="0 0 24 24" width="16" height="16"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+            </button>
+          </div>
+          <div class="zoom">
+            <button class="icon-btn" id="btnZoomOut" title="缩小">
+              <svg viewBox="0 0 24 24" width="16" height="16"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M5 12h14"/></svg>
+            </button>
+            <button class="text-btn" id="btnZoomLevel" title="点击重置缩放">100%</button>
+            <button class="icon-btn" id="btnZoomIn" title="放大">
+              <svg viewBox="0 0 24 24" width="16" height="16"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 5v14M5 12h14"/></svg>
+            </button>
+            <button class="icon-btn" id="btnFitWidth" title="适应宽度">
+              <svg viewBox="0 0 24 24" width="16" height="16"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M4 6v12M20 6v12M8 12h8"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="tb-right">
+          <button class="icon-btn" id="btnCapture" title="区域截图后提问（无法选中文本时使用）">
+            <svg viewBox="0 0 24 24" width="16" height="16"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" d="M3 8V5h3M21 8V5h-3M3 16v3h3M21 16v3h-3M3 12h4l1.5-2h7L17 12h4"/></svg>
+          </button>
+          <button class="icon-btn" id="btnOpenNote" title="打开笔记文件所在位置">
+            <svg viewBox="0 0 24 24" width="16" height="16"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" d="M14 3v5h5M9 13h6M9 17h4"/></svg>
+          </button>
+          <button class="icon-btn" id="btnSettings" title="设置（Ctrl+,）">
+            <svg viewBox="0 0 24 24" width="16" height="16"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- ============================ 主体 ============================ -->
+      <div class="body">
+        <!-- 活动栏 -->
+        <nav class="activitybar">
+          <button class="ab-btn active" data-view="pages" title="页面缩略图">
+            <svg viewBox="0 0 24 24" width="20" height="20"><rect x="5" y="3" width="9" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="10" y="9" width="9" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".6"/></svg>
+          </button>
+          <button class="ab-btn" data-view="outline" title="目录">
+            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" d="M4 6h16M4 12h10M4 18h13"/></svg>
+          </button>
+          <button class="ab-btn" data-view="discussions" title="讨论历史">
+            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" d="M20 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/></svg>
+          </button>
+          <button class="ab-btn" data-view="library" title="文档库">
+            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" d="M4 19V6a2 2 0 0 1 2-2h4l2 2h8v13z"/></svg>
+          </button>
+          <div class="ab-spacer"></div>
+          <button class="ab-btn" id="btnToggleTheme" title="切换主题">
+            <svg viewBox="0 0 24 24" width="20" height="20"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg>
+          </button>
+          <button class="ab-btn" id="btnSettings2" title="设置">
+            <svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.7"/><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1"/></svg>
+          </button>
+        </nav>
+
+        <!-- 侧边栏 -->
+        <aside class="sidebar" id="sidebar">
+          <div class="sidebar-head">
+            <span id="sidebarTitle">页面</span>
+            <span class="sidebar-count" id="sidebarCount"></span>
+          </div>
+          <div class="sidebar-body" id="sidebarBody"></div>
+        </aside>
+
+        <!-- PDF 阅读区 -->
+        <main class="viewer-area">
+          <div class="pages-scroll" id="pagesScroll">
+            <div class="pages" id="pages">
+              <div class="empty-state" id="emptyState">
+                <svg viewBox="0 0 24 24" width="64" height="64" aria-hidden="true">
+                  <path fill="none" stroke="currentColor" stroke-width="1.2" d="M6 2h8l6 6v14H6z" opacity=".55"/>
+                  <path fill="none" stroke="currentColor" stroke-width="1.2" d="M14 2v6h6" opacity=".55"/>
+                  <path fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" d="M9 13h6M9 17h4" opacity=".8"/>
+                </svg>
+                <h2>拖入 PDF，或按 Ctrl+O 打开</h2>
+                <p>选中一段文字即可在右侧与 AI 讨论；纯扫描件可用工具栏的「区域截图」。</p>
+                <button class="primary-btn" id="btnOpenFirst">打开 PDF</button>
+              </div>
+            </div>
+          </div>
+          <div class="drop-mask" id="dropMask"><div>松开以打开 PDF</div></div>
+        </main>
+
+        <!-- 分隔条 -->
+        <div class="splitter" id="splitter" title="拖拽调整宽度"></div>
+
+        <!-- 聊天面板 -->
+        <section class="chat-panel" id="chatPanel">
+          <div class="chat-head">
+            <div class="chat-head-top">
+              <span class="chat-title" id="chatTitle">AI 讨论</span>
+              <div class="chat-head-actions">
+                <button class="icon-btn sm" id="btnConvList" title="所有讨论">
+                  <svg viewBox="0 0 24 24" width="15" height="15"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M4 7h16M4 12h16M4 17h10"/></svg>
+                </button>
+                <button class="icon-btn sm" id="btnNewConv" title="开启新讨论">
+                  <svg viewBox="0 0 24 24" width="15" height="15"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M12 5v14M5 12h14"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="mode-switch" id="modeSwitch">
+              <button class="mode-btn active" data-mode="context">
+                <svg viewBox="0 0 24 24" width="14" height="14"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" d="M6 3h9l3 3v15H6z"/><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" d="M9 11h6M9 15h5"/></svg>
+                PDF 上下文
+              </button>
+              <button class="mode-btn" data-mode="web">
+                <svg viewBox="0 0 24 24" width="14" height="14"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.7"/><path fill="none" stroke="currentColor" stroke-width="1.7" d="M3 12h18M12 3c2.5 3 2.5 15 0 18M12 3c-2.5 3-2.5 15 0 18"/></svg>
+                联网检索
+              </button>
+            </div>
+
+            <div class="ctx-bar" id="ctxBar">
+              <button class="ctx-chip" id="btnCtxScope" title="点击设置送入 AI 的正文范围">
+                <svg viewBox="0 0 24 24" width="13" height="13"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M4 7h16M4 12h16M4 17h10"/></svg>
+                <span id="ctxScopeLabel">选中位置 ±2 页</span>
+              </button>
+              <span class="ctx-token" id="ctxToken" title="本次预估送入的 token 数 / 上限">0 / 12000</span>
+              <span class="ctx-warn hidden" id="ctxWarn" title="正文已被截断">已截断</span>
+            </div>
+          </div>
+
+          <div class="chat-messages" id="chatMessages">
+            <div class="chat-placeholder" id="chatPlaceholder">
+              <div class="cp-icon">
+                <svg viewBox="0 0 24 24" width="30" height="30"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" d="M20 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/></svg>
+              </div>
+              <h3>还没有讨论</h3>
+              <p>在左侧 PDF 中<b>选中一段文字</b>，点击浮出的「与 AI 讨论」，即可开始一轮新讨论。</p>
+              <p class="cp-hint">纯扫描件？用顶栏的<svg viewBox="0 0 24 24" width="13" height="13" style="vertical-align:-2px"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" d="M3 8V5h3M21 8V5h-3M3 16v3h3M21 16v3h-3M3 12h4l1.5-2h7L17 12h4"/></svg> 框选区域提问。</p>
+            </div>
+          </div>
+
+          <div class="chat-compose" id="chatCompose">
+            <div class="quote-preview hidden" id="quotePreview">
+              <span class="qp-label" id="qpLabel">第 0 页</span>
+              <span class="qp-text" id="qpText"></span>
+              <button class="qp-close" id="qpClose" title="移除引用">
+                <svg viewBox="0 0 24 24" width="13" height="13"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg>
+              </button>
+            </div>
+            <div class="compose-box">
+              <textarea id="chatInput" rows="1" placeholder="就这段内容提问…（Enter 发送，Shift+Enter 换行）"></textarea>
+              <button class="send-btn" id="btnSend" title="发送（Enter）">
+                <svg viewBox="0 0 24 24" width="18" height="18"><path fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" d="M4 12l16-8-6 8 6 8z"/></svg>
+              </button>
+              <button class="stop-btn hidden" id="btnStop" title="停止生成">
+                <svg viewBox="0 0 24 24" width="18" height="18"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></svg>
+              </button>
+            </div>
+            <div class="compose-foot">
+              <span class="cf-left" id="composeHint"></span>
+              <span class="cf-right">
+                <button class="mini-btn" id="btnMarkConclusion" title="把 AI 最后一条回复标记为结论">标记结论</button>
+                <button class="mini-btn" id="btnAnnotate" title="把本轮讨论写回 PDF 注记">写入注记</button>
+              </span>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- ============================ 状态栏 ============================ -->
+      <footer class="statusbar">
+        <span class="sb-item" id="sbFile">未打开文档</span>
+        <span class="sb-sep"></span>
+        <span class="sb-item" id="sbPos">—</span>
+        <span class="sb-sep"></span>
+        <span class="sb-item" id="sbText">文本提取：—</span>
+        <span class="sb-grow"></span>
+        <span class="sb-item" id="sbModel">模型：—</span>
+        <span class="sb-sep"></span>
+        <span class="sb-item" id="sbNote">笔记：—</span>
+      </footer>
+    </div>
+
+    <!-- ============================ 浮层 ============================ -->
+    <!-- 选中文本后的浮动工具条 -->
+    <div class="sel-popup hidden" id="selPopup">
+      <button class="sp-btn primary" id="spDiscuss">
+        <svg viewBox="0 0 24 24" width="14" height="14"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M20 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/></svg>
+        与 AI 讨论
+      </button>
+      <button class="sp-btn" id="spDiscussWeb" title="联网检索讨论">
+        <svg viewBox="0 0 24 24" width="14" height="14"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path fill="none" stroke="currentColor" stroke-width="1.8" d="M3 12h18M12 3c2.5 3 2.5 15 0 18"/></svg>
+      </button>
+      <button class="sp-btn" id="spCopy" title="复制">
+        <svg viewBox="0 0 24 24" width="14" height="14"><rect x="9" y="9" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path fill="none" stroke="currentColor" stroke-width="1.8" d="M15 5H6a2 2 0 0 0-2 2v9"/></svg>
+      </button>
+    </div>
+
+    <!-- 区域截图遮罩 -->
+    <div class="capture-overlay hidden" id="captureOverlay">
+      <div class="capture-hint">按住左键框选要提问的区域，Esc 取消</div>
+      <div class="capture-rect hidden" id="captureRect"></div>
+    </div>
+    <!-- 截图预览 -->
+    <div class="capture-preview hidden" id="capturePreview">
+      <div class="cp-head">
+        <span>区域截图</span>
+        <button class="icon-btn sm" id="cpRetake" title="重新框选">重选</button>
+      </div>
+      <img id="cpImage" alt="区域截图" />
+      <div class="cp-foot">
+        <input type="text" id="cpQuestion" placeholder="针对这块区域提问…" />
+        <button class="primary-btn sm" id="cpSend">发送</button>
+        <button class="text-btn" id="cpCancel">取消</button>
+      </div>
+      <div class="cp-warn hidden" id="cpWarn">当前模型不支持识图，将改为「已截取该区域」的文字描述方式提问。</div>
+    </div>
+
+    <!-- 设置抽屉 -->
+    <div class="drawer-mask hidden" id="drawerMask"></div>
+    <div class="drawer hidden" id="settingsDrawer"></div>
+
+    <!-- 会话列表抽屉 -->
+    <div class="drawer hidden" id="convDrawer">
+      <div class="drawer-head">
+        <span>本 PDF 的讨论记录</span>
+        <button class="icon-btn sm" id="convDrawerClose">
+          <svg viewBox="0 0 24 24" width="15" height="15"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="drawer-body" id="convDrawerBody"></div>
+    </div>
+
+    <!-- 上下文范围设置气泡 -->
+    <div class="popover hidden" id="scopePopover"></div>
+
+    <!-- Toast -->
+    <div class="toast-host" id="toastHost"></div>
+
+    <script type="module" src="app://local/src/js/app.js"></script>
+  </body>
+</html>

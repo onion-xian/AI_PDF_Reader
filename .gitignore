@@ -1,0 +1,6 @@
+node_modules/
+dist/
+*.log
+
+# 用户数据（设置、会话、笔记）会写入 app.getPath('userData')
+# 默认在 %APPDATA%/ai-pdf-reader 或 Electron 默认目录，按需忽略

@@ -1,0 +1,50 @@
+{
+  "name": "pdf-ai-reader",
+  "productName": "AI PDF Reader",
+  "version": "alpha20260829",
+  "description": "面向论文与专业书籍的 AI 辅助学习 PDF 阅读器",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "node scripts/start.js",
+    "smoke": "node scripts/smoke.js 13",
+    "postinstall": "node scripts/copy-vendor.js",
+    "dist": "electron-builder --win"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "4.8.69"
+  },
+  "devDependencies": {
+    "electron": "^33.3.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.pdfai.reader",
+    "productName": "AI PDF Reader",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron/**/*",
+      "src/**/*",
+      "vendor/**/*",
+      "package.json"
+    ],
+    "extraMetadata": {
+      "main": "electron/main.js"
+    },
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": "x64" }
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    }
+  }
+}
