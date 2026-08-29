@@ -157,6 +157,26 @@ npm run dist                 # 产出 dist/win-unpacked/ 下的免安装目录�
 
 ---
 
+## 下载安装包（Release）
+
+打包产物会作为 **GitHub Release** 附件发布，直接下载即可分发：
+
+- **本版本下载**：[AI-PDF-Reader-Setup-1.0.0-alpha.20260829.exe](https://github.com/onion-xian/AI_PDF_Reader/releases/download/alpha-20260829/AI-PDF-Reader-Setup-1.0.0-alpha.20260829.exe)（约 99.7 MB，NSIS 安装包，含可选安装路径、桌面/开始菜单快捷方式、卸载入口）
+- **全部 Release**：<https://github.com/onion-xian/AI_PDF_Reader/releases>
+
+> 当前仓库为**私有**，Release 仅协作者可见。若要对外公开分发，需把仓库设为 Public，或单独邀请下载者成为协作者。
+> 安装包**未做代码签名**，首次在他人机器运行会被 Windows SmartScreen 拦截（显示“未知发布者”），点“仍要运行”即可；如需消除该提示需自行购买代码签名证书。
+
+### 版本号规则
+
+- 主版本号格式：`alpha-YYYYMMDD`（按**实际提交/上传日期**命名，例如 `alpha-20260829`）。
+- **若同一天向仓库上传了多个版本**，在日期后缀后再追加英文字母表示“当日第几个”：
+  `alpha-20260829`（第 1 个）→ `alpha-20260829a`（第 2 个）→ `alpha-20260829b`（第 3 个）…依此类推。
+- 对应的 `package.json` 版本号取 semver 形式：`1.0.0-alpha.20260829`、`1.0.0-alpha.20260829a` …（electron-builder 要求合法 semver）。
+- 提交信息与 git tag 均使用上述 `alpha-...` 版本号。
+
+---
+
 ## 已知边界 / 设计取舍
 
 - **坐标系统**：PDF 用户坐标（左下原点，y 向上）与 CSS 坐标（左上原点，y 向下）不同，
