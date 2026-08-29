@@ -3,4 +3,12 @@ dist/
 *.log
 
 # 用户数据（设置、会话、笔记）会写入 app.getPath('userData')
-# 默认在 %APPDATA%/ai-pdf-reader 或 Electron 默认目录，按需忽略
+# 实际位于 %APPDATA%/AI PDF Reader/，不在项目目录内，本就不会被提交。
+# 以下规则是防御性的：万一有人把凭证/数据文件复制到项目目录，也不会误提交。
+settings.json
+conversations/
+notes/
+*.bak
+
+# 不要把 PDF 测试文件与笔记示例之外的数据放进仓库
+*.pdf
