@@ -6,6 +6,9 @@
 
 > 界面参考 VS Code：左 PDF、右对话、活动栏切换 页面 / 大纲 / 讨论 / 书库。
 
+> **给 AI / 协作者**：仓库根目录的 [`AGENTS.md`](./AGENTS.md) 是面向编码 agent 的交接说明书，
+> 记录了发版流程、版本号规则、架构红线与已知天坑。接手开发前请先读它。
+
 ---
 
 ## 功能特性
@@ -161,10 +164,11 @@ npm run dist                 # 产出 dist/win-unpacked/ 下的免安装目录�
 
 打包产物会作为 **GitHub Release** 附件发布，直接下载即可分发：
 
-- **本版本下载**：[AI-PDF-Reader-Setup-1.0.0-alpha.20260829.exe](https://github.com/onion-xian/AI_PDF_Reader/releases/download/alpha-20260829/AI-PDF-Reader-Setup-1.0.0-alpha.20260829.exe)（约 99.7 MB，NSIS 安装包，含可选安装路径、桌面/开始菜单快捷方式、卸载入口）
+- **最新安装包**：[AI-PDF-Reader-Setup-1.0.0-alpha.20260829.exe](https://github.com/onion-xian/AI_PDF_Reader/releases/download/alpha-20260829/AI-PDF-Reader-Setup-1.0.0-alpha.20260829.exe)（约 99.7 MB，NSIS 安装包，含可选安装路径、桌面/开始菜单快捷方式、卸载入口）
 - **全部 Release**：<https://github.com/onion-xian/AI_PDF_Reader/releases>
 
-> 当前仓库为**私有**，Release 仅协作者可见。若要对外公开分发，需把仓库设为 Public，或单独邀请下载者成为协作者。
+> `alpha-20260830` 为**文档版本**（新增 `AGENTS.md` 交接说明书），无代码与二进制变更，因此未重新打包；安装包仍沿用上述 `alpha-20260829` 的产物。
+> 仓库已设为 **Public**，Release 任何人可见可下载。
 > 安装包**未做代码签名**，首次在他人机器运行会被 Windows SmartScreen 拦截（显示“未知发布者”），点“仍要运行”即可；如需消除该提示需自行购买代码签名证书。
 
 ### 版本号规则
