@@ -2,7 +2,7 @@
 
 > 本文件随仓库走。任何克隆本仓库的编码 agent（Claude Code / Codex / Cursor / WorkBuddy 等）都应**先读本文件再动手**。
 > 约定以本文件为准；WorkBuddy 工作区记忆 `D:\workbuddy\.workbuddy\memory\MEMORY.md` 另有补充。
-> 最后更新：2026-08-30（版本 alpha-20260830）。
+> 最后更新：2026-08-30（版本 alpha-20260830a）。
 
 ## 1. 项目一句话
 
@@ -65,6 +65,10 @@ npm run test:manual              # 手动标注自测 28 项（scripts/selftest-
 - **`npm run dist` 退出码 1 是误报**：本机「安全删除」包装会拦截清理 `*.nsis.7z` 临时文件，导致退出码非 0，但**安装包本体已生成**。
   判断是否成功以 `dist/*.exe` 是否产出为准，别被退出码骗；残留的 `*.nsis.7z` 用 PowerShell `Remove-Item -LiteralPath <绝对路径>` 清掉。
 - **exe 文件被占用**：重建前先 `taskkill //F //IM "AI PDF Reader.exe"`，并用绝对路径删 `dist`（Bash 的相对路径删除会被安全包装解析错）。
+- **`git push` 走不通时的兜底（本机高频）**：代理只对 `api.github.com` 放行，对 `github.com` 返回 `502 CONNECT tunnel failed`，于是 git 的 https 传输直接卡死（表现为长时间无输出）。
+  判断方法：`curl https://api.github.com` 通、而 `git ls-remote https://github.com/...` 报 CONNECT 502 → 就是这种情况。
+  解决办法：用 `node scripts/push-via-api.js [--tag <版本号>]` 走 REST API 推送（建 blob → tree → commit → 更新 ref → 建附注标签）。
+  ⚠️ 该脚本会在远端**生成新的 commit sha**（与本地 sha 不同，内容一致），因此本地与远端历史会一次性分叉。**待网络恢复后请执行** `git fetch origin && git reset --soft origin/main` 重新对齐，之后照常用 `git push`。
 - **Windows 环境杂项**：Git Bash 里没有 `sleep`；`timeout` 会解析到 CMD 的 TIMEOUT 而报错；从 Bash 调 `powershell.exe` 会被安全策略拦，要用 PowerShell 工具。
 - **不要提交**：`dist/`、`node_modules/`、`.env*`、`*.bak`、`*.nsis.7z`、`.release_body.json`、用户数据（`%APPDATA%`）。`.gitignore` 已覆盖。
 
@@ -81,6 +85,7 @@ npm run test:manual              # 手动标注自测 28 项（scripts/selftest-
 | `src/js/chat.js` | 讨论与 AI 注记写回；`pdf-dirty` 带受影响的页码数组 |
 | `src/js/manual-annot.js` | 渲染层手动标注状态机（4 类型 × 6 色、编辑气泡、写回 PDF） |
 | `scripts/make-icon.js` | 手工生成多尺寸 ICO（绕开 Pillow 缺陷） |
+| `scripts/push-via-api.js` | `git push` 不通时的兜底：走 GitHub REST API 推送 HEAD 并打标签 |
 | `scripts/selftest.js` / `selftest-manual.js` / `check-icon.js` | 主自测 42 项 / 手动标注自测 28 项 / exe 图标校验 |
 | `build/icon.ico` | 应用图标（由 `make-icon.js` 生成，勿手工改） |
 | `README.md` | 完整架构、功能、下载章节、版本号规则 |
@@ -91,6 +96,7 @@ npm run test:manual              # 手动标注自测 28 项（scripts/selftest-
 | --- | --- | --- |
 | `alpha-20260829` | 2026-08-29 | 性能优化（注记写回增量刷新）+ 手动标注（4 类型 × 6 色）+ 图标修复 + NSIS 安装包 |
 | `alpha-20260830` | 2026-08-30 | 新增 `AGENTS.md` 交接说明书；清理残留临时文件并补 `.gitignore`（文档版本，无二进制变更） |
+| `alpha-20260830a` | 2026-08-30 | 新增 `scripts/push-via-api.js`（代理只放行 api.github.com 时的推送兜底），并同步 `AGENTS.md` |
 
 ## 9. 版本更新时同步本文件（硬性要求）
 

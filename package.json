@@ -1,7 +1,7 @@
 {
   "name": "pdf-ai-reader",
   "productName": "AI PDF Reader",
-  "version": "1.0.0-alpha.20260830",
+  "version": "1.0.0-alpha.20260830a",
   "description": "面向论文与专业书籍的 AI 辅助学习 PDF 阅读器",
   "main": "electron/main.js",
   "scripts": {
